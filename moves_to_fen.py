@@ -4,7 +4,6 @@ import sys
 BOARD_FILES = 'abcdefgh'
 BOARD_RANKS = '87654321'
 
-to_move = 'w'
 reference_board = [
     ['r','n','b','q','k','b','n','r'],
     ['p','p','p','p','p','p','p','p'],
@@ -36,7 +35,12 @@ def clone_board(board):
 
 board = clone_board(reference_board)
 
-castling_rights = 'KQkq'
+castling_rights = {
+    'white_kingside': True,
+    'white_queenside': True,
+    'black_kingside': True,
+    'black_queenside': True,
+}
 
 pawn_forward_moves = [
     'a3','b3','c3','d3','e3','f3','g3','h3',
@@ -99,6 +103,15 @@ def print_board(board):
         #print_row = [icon_table.get(piece, piece) for piece in row]
         print(''.join(row))
 
+def print_castling_rights(castling_rights):
+    result = ''
+    result += 'K' if castling_rights['white_kingside'] else ''
+    result += 'Q' if castling_rights['white_queenside'] else ''
+    result += 'k' if castling_rights['black_kingside'] else ''
+    result += 'q' if castling_rights['black_queenside'] else ''
+    if result:
+        print(result)
+        
 def pawn_is_taking_without_promoting(move):
     if len(move) != 4:
         return False
@@ -304,7 +317,7 @@ def move_piece(board, start_coords, end_coords, piece):
     clear_coords(board, start_coords)
     fill_coords(board, end_coords, piece)
 
-def get_knight_start_coords(board, move, end_coords, player, piece):
+def get_knight_start_coords(board, move, end_coords, player, piece, *misc):
     move = move.replace('x','')
     move = move.replace('+','')
     if len(move) == 5:
@@ -349,19 +362,28 @@ def get_brq_start_coords(board, move, end_coords, get_radius_fn, brq_can_reach_f
         if not king_is_in_check(board_clone, player):
             return candidate
 
-def get_bishop_start_coords(board, move, end_coords, player, piece):
+def get_bishop_start_coords(board, move, end_coords, player, piece, *misc):
     return get_brq_start_coords(
         board, move, end_coords, get_bishop_radius,
         bishop_can_reach_square, player, piece
     )
     
-def get_rook_start_coords(board, move, end_coords, player, piece):
-    return get_brq_start_coords(
+def get_rook_start_coords(board, move, end_coords, player, piece, castling_rights):
+    start_coords = get_brq_start_coords(
         board, move, end_coords, get_rook_radius,
         rook_can_reach_square, player, piece
     )
+    if player == 'w' and start_coords == (0,7):
+        disable_castling_rights(player, castling_rights, kingside=False, queenside=True)
+    elif player == 'w' and start_coords == (7,7):
+        disable_castling_rights(player, castling_rights, kingside=True, queenside=False)
+    elif player == 'b' and start_coords == (0,0):
+        disable_castling_rights(player, castling_rights, kingside=False, queenside=True)
+    elif player == 'b' and start_coords == (7,0):
+        disable_castling_rights(player, castling_rights, kingside=True, queenside=False)
+    return start_coords
     
-def get_queen_start_coords(board, move, end_coords, player, piece):
+def get_queen_start_coords(board, move, end_coords, player, piece, *misc):
     return get_brq_start_coords(
         board, move, end_coords, get_queen_radius,
         queen_can_reach_square, player, piece
@@ -374,7 +396,7 @@ move_fn_map = {
     'Q': get_queen_start_coords
 }
 
-def castle(board, player, is_kingside):
+def castle(board, player, castling_rights, is_kingside):
     king = 'K' if player == 'w' else 'k'
     rook = 'R' if player == 'w' else 'r'
     rank = BOARD_RANKS.index('1') if player == 'w' else BOARD_RANKS.index('8')
@@ -385,19 +407,30 @@ def castle(board, player, is_kingside):
     clear_coords(board, (BOARD_FILES.index(clear_castle_file), rank))
     fill_coords(board, (BOARD_FILES.index(new_king_file), rank), king)
     fill_coords(board, (BOARD_FILES.index(new_castle_file), rank), rook)
+    disable_castling_rights(player, castling_rights, kingside=True, queenside=True)
+    print_board(board)
+    print_castling_rights(castling_rights)
 
 def is_castles(move):
     return move in ['O-O','O-O-O']
 
 def is_king_move(move):
     return move[0] == 'K'
+
+def disable_castling_rights(player, castling_rights, kingside, queenside):
+    if player == 'w':
+        castling_rights['white_kingside'] &= not kingside
+        castling_rights['white_queenside'] &= not queenside
+    else:
+        castling_rights['black_kingside'] &= not kingside
+        castling_rights['black_queenside'] &= not queenside
     
-def process_move(board, move, player):
+def process_move(board, move, player, castling_rights):
     if is_castles(move):
         if move == 'O-O':
-            castle(board, player, is_kingside=True)
+            castle(board, player, castling_rights, is_kingside=True)
         else:
-            castle(board, player, is_kingside=False)
+            castle(board, player, castling_rights, is_kingside=False)
         return
     end_square = get_end_square(move)
     end_coords = get_coords_from_square(end_square)
@@ -409,24 +442,32 @@ def process_move(board, move, player):
         if pawn_is_taking_without_promoting(move):
             clear_en_passant_coords_if_necessary(board, move, player)
     elif move[0] in move_fn_map:
-        start_coords = move_fn_map[move[0]](board, move, end_coords, player, piece)
+        start_coords = move_fn_map[move[0]](board, move, end_coords, player, piece, castling_rights)
     elif is_king_move(move):
         start_coords = get_king_coords(board, player)
+        disable_castling_rights(player, castling_rights, kingside=True,queenside=True)
 
     move_piece(board, start_coords, end_coords, piece)
     print_board(board)
+    print_castling_rights(castling_rights)
     pass
 
 print_board(board)
+print()
 
-#moves = ['e4', 'e5', 'd4', 'exd4','Nc3','dxc3', 'Bc4']
 moves = ["e4", "d5", "exd5", "Qxd5", "Qf3", "Qxf3", "Nxf3", "Nf6", "Bc4", "Nc6", "d3", "Bf5", "Nc3", "O-O-O", "O-O", "Na5", "Bb3", "Nxb3", "axb3", "Kb8", "Be3", "b6", "Nb5", "a5", "c3", "Bc8", "b4", "Ba6", "c4", "Bxb5", "cxb5", "Rxd3", "bxa5", "bxa5", "Rxa5", "Rb3", "Rfa1", "Kc8", "Bd4", "e6", "Bc3", "Bd6", "Nd4", "Kd7", "Nxb3", "Nd5", "Nd4", "Nxc3", "bxc3", "Ke7", "c4", "Kf6", "Nc6", "Bc5", "Ra6", "Bb6", "R6a4", "Bc5", "Rc1", "Re8", "Rd1", "e5", "Nd8", "Bd6", "Nc6", "Bc5", "Rd5", "Bb6", "Ra6", "Bd4", "Nxd4+", "Ke7", "Nf3"]
 
 for idx, move in enumerate(moves):
-    print(f'({idx}.) {move}')
-    process_move(board, move, 'w' if idx % 2 == 0 else 'b')
+    print()
+    print(f'{idx+1}   {move}')
+    print('++++++++')
+    print()
+    process_move(board, move, 'w' if idx % 2 == 0 else 'b', castling_rights)
     print()
 
+def get_fen_notation():
+    
+    
 """
 print()
 print()
@@ -434,19 +475,4 @@ print()
 
 
 print_board(test_board)
-
-player_king_coords = get_king_coords(test_board, 'w')
-opp_rook_coords = get_rook_coords(test_board, 'b')
-for rook_coords in opp_rook_coords:
-    print(f'{rook_checks_king(test_board, rook_coords, player_king_coords)=}')
-
-print('\n========================================\n')    
-    
-player_king_coords = get_king_coords(test_board, 'w')
-opp_bishop_coords = get_bishop_coords(test_board, 'b')
-for bishop_coords in opp_bishop_coords:
-    print(f'{bishop_checks_king(test_board, bishop_coords, player_king_coords)=}')
-
-print('\n========================================\n')    
-print(king_is_in_check(test_board, 'w'))
 """
