@@ -34,14 +34,17 @@ def clone_board(board):
     return new_board
 
 board = clone_board(reference_board)
-en_passant_target = '-'
-halfmove_clock = 0
 
 castling_rights = {
     'white_kingside': True,
     'white_queenside': True,
     'black_kingside': True,
     'black_queenside': True,
+}
+
+misc_data = {
+    'en_passant_target': '-',
+    'halfmove_clock': 0
 }
 
 pawn_forward_moves = [
@@ -427,10 +430,11 @@ def disable_castling_rights(player, castling_rights, kingside, queenside):
         castling_rights['black_kingside'] &= not kingside
         castling_rights['black_queenside'] &= not queenside
     
-def process_move(board, move, player, castling_rights, en_passant_target, halfmove_clock):
+def process_move(board, move, player, castling_rights, misc_data):
+    misc_data['halfmove_clock'] += 1
     if 'x' in move:
-        halfmove_clock = 0
-    en_passant_target = '-'
+        misc_data['halfmove_clock'] = 0
+    misc_data['en_passant_target'] = '-'
     if is_castles(move):
         if move == 'O-O':
             castle(board, player, castling_rights, is_kingside=True)
@@ -442,13 +446,13 @@ def process_move(board, move, player, castling_rights, en_passant_target, halfmo
     start_coords = (-1,-1)
     piece = move[0].upper() if player == 'w' else move[0].lower()
     if is_pawn_move(move):
-        halfmove_clock = 0
+        misc_data['halfmove_clock'] = 0
         piece = 'P' if player == 'w' else 'p'
         start_coords = get_pawn_start_coords(board, move, player)
         start_coords_file = start_coords[0]
         end_coords_file = end_coords[0]
-        if start_coords == end_coords and abs(start_coords[1] - end_coords[1]) == 2:
-            en_passant_target = (start_coords[0], min(start_coords[1], end_coords[1]) + 1)
+        if start_coords_file == end_coords_file and abs(start_coords[1] - end_coords[1]) == 2:
+            misc_data['en_passant_target'] = index_to_square((start_coords[0], min(start_coords[1], end_coords[1]) + 1))
         if pawn_is_taking_without_promoting(move):
             clear_en_passant_coords_if_necessary(board, move, player)
     elif move[0] in move_fn_map:
@@ -466,15 +470,15 @@ print_board(board)
 print()
 
 #moves = ["e4", "d5", "exd5", "Qxd5", "Qf3", "Qxf3", "Nxf3", "Nf6", "Bc4", "Nc6", "d3", "Bf5", "Nc3", "O-O-O", "O-O", "Na5", "Bb3", "Nxb3", "axb3", "Kb8", "Be3", "b6", "Nb5", "a5", "c3", "Bc8", "b4", "Ba6", "c4", "Bxb5", "cxb5", "Rxd3", "bxa5", "bxa5", "Rxa5", "Rb3", "Rfa1", "Kc8", "Bd4", "e6", "Bc3", "Bd6", "Nd4", "Kd7", "Nxb3", "Nd5", "Nd4", "Nxc3", "bxc3", "Ke7", "c4", "Kf6", "Nc6", "Bc5", "Ra6", "Bb6", "R6a4", "Bc5", "Rc1", "Re8", "Rd1", "e5", "Nd8", "Bd6", "Nc6", "Bc5", "Rd5", "Bb6", "Ra6", "Bd4", "Nxd4+", "Ke7", "Nf3"]
-moves = ["e4", "d5", "exd5", "Qxd5"]
+moves = ["e4", "d5", "exd5", "Qxd5", "Qf3", "Qxf3", "Nxf3", "Nf6", "Bc4", "Nc6", "d3", "Bf5", "Nc3", "O-O-O", "O-O", "Na5", "Bb3", "Nxb3", "axb3", "Kb8", "Be3", "b6", "Nb5", "a5", "c3", "Bc8", "b4", "Ba6", "c4", "Bxb5", "cxb5", "Rxd3", "bxa5", "bxa5", "Rxa5", "Rb3", "Rfa1", "Kc8", "Bd4", "e6", "Bc3", "Bd6", "Nd4", "Kd7", "Nxb3", "Nd5", "Nd4", "Nxc3", "bxc3", "Ke7", "c4", "Kf6", "Nc6", "Bc5", "Ra6", "Bb6", "R6a4", "Bc5", "Rc1", "Re8", "Rd1", "e5", "Nd8", "Bd6", "Nc6", "Bc5", "Rd5", "Bb6", "Ra6", "Bd4", "Nxd4+", "Ke7", "Nf3"]
 
 for idx, move in enumerate(moves):
     print()
     print(f'{idx+1}   {move}')
     print('++++++++')
     print()
-    process_move(board, move, 'w' if idx % 2 == 0 else 'b', castling_rights, en_passant_target, halfmove_clock)
-    print(f'{en_passant_target=}, {halfmove_clock=}')
+    process_move(board, move, 'w' if idx % 2 == 0 else 'b', castling_rights, misc_data)
+    #print(misc_data)
     print()
 
 def get_fen_notation(board, move_num, castling_rights):
