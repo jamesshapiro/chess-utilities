@@ -105,8 +105,8 @@ icon_table = {
     
 def print_board(board):
     for row in board:
-        #print_row = [icon_table.get(piece, piece) for piece in row]
-        print(''.join(row))
+        #row = [icon_table.get(piece, piece) for piece in row]
+        print(' '.join(row))
 
 def get_castling_rights(castling_rights):
     result = ''
@@ -118,44 +118,37 @@ def get_castling_rights(castling_rights):
         return result
     return '-'
         
-def pawn_is_taking_without_promoting(move):
-    if len(move) != 4:
-        return False
-    if move[0] not in BOARD_FILES:
-        return False
-    if move[1] != 'x':
-        return False
-    if move[2] not in BOARD_FILES:
-        return False
-    return move[3] in BOARD_RANKS
+def pawn_is_taking(move):
+    return move[0] in BOARD_FILES and move[1] == 'x'
 
-def pawn_is_moving_forward_without_promoting(move):
-    return move in pawn_forward_moves
+def pawn_is_moving_forward(move):
+    move = move.replace('+','')
+    if move[0] in BOARD_FILES and move[1] in BOARD_RANKS:
+        return True
 
 def is_pawn_move(move):
-    return any([
-        pawn_is_moving_forward_without_promoting(move),
-        pawn_is_taking_without_promoting(move)        
-    ])
+    return move[0] in BOARD_FILES
 
 def get_end_square(move):
     move = move.replace('+','')
     if '=' not in move:
         return move[-2:]
-    print('TODO: implement promotion')
-    sys.exit(0)
+    if 'x' in move:
+        return move[2:4]
+    return move[:2]
 
 def get_pawn_start_coords(board, move, player):
     move = move.replace('+','')
     end_square = get_end_square(move)
     end_coords_file, end_coords_rank = get_coords_from_square(end_square)
     preceding_rank = end_coords_rank + 1 if player == 'w' else end_coords_rank - 1
-    if pawn_is_moving_forward_without_promoting(move):
+    # The logic here checks if the pawn moved forward two moves our not
+    if pawn_is_moving_forward(move):
         preceding_file = end_coords_file
         if get_piece_from_coords(board, (preceding_file, preceding_rank)).lower() != 'p':
             preceding_rank = end_coords_rank + 2 if player == 'w' else end_coords_rank - 2
         return preceding_file, preceding_rank
-    elif pawn_is_taking_without_promoting(move):
+    elif pawn_is_taking(move):
         preceding_file = BOARD_FILES.index(move[0])
         return preceding_file, preceding_rank
 
@@ -448,12 +441,15 @@ def process_move(board, move, player, castling_rights, misc_data):
     if is_pawn_move(move):
         misc_data['halfmove_clock'] = 0
         piece = 'P' if player == 'w' else 'p'
+        if end_coords[1] in [0,7]:
+            piece = move.replace('+','')[-1]
+            piece = piece.upper() if player == 'w' else piece.lower()
         start_coords = get_pawn_start_coords(board, move, player)
         start_coords_file = start_coords[0]
         end_coords_file = end_coords[0]
         if start_coords_file == end_coords_file and abs(start_coords[1] - end_coords[1]) == 2:
             misc_data['en_passant_target'] = index_to_square((start_coords[0], min(start_coords[1], end_coords[1]) + 1))
-        if pawn_is_taking_without_promoting(move):
+        if pawn_is_taking(move):
             clear_en_passant_coords_if_necessary(board, move, player)
     elif move[0] in move_fn_map:
         start_coords = move_fn_map[move[0]](board, move, end_coords, player, piece, castling_rights)
@@ -469,7 +465,8 @@ print_board(board)
 print()
 
 moves = ["e4", "d5", "exd5", "Qxd5", "Qf3", "Qxf3", "Nxf3", "Nf6", "Bc4", "Nc6", "d3", "Bf5", "Nc3", "O-O-O", "O-O", "Na5", "Bb3", "Nxb3", "axb3", "Kb8", "Be3", "b6", "Nb5", "a5", "c3", "Bc8", "b4", "Ba6", "c4", "Bxb5", "cxb5", "Rxd3", "bxa5", "bxa5", "Rxa5", "Rb3", "Rfa1", "Kc8", "Bd4", "e6", "Bc3", "Bd6", "Nd4", "Kd7", "Nxb3", "Nd5", "Nd4", "Nxc3", "bxc3", "Ke7", "c4", "Kf6", "Nc6", "Bc5", "Ra6", "Bb6", "R6a4", "Bc5", "Rc1", "Re8", "Rd1", "e5", "Nd8", "Bd6", "Nc6", "Bc5", "Rd5", "Bb6", "Ra6", "Bd4", "Nxd4+", "Ke7", "Nf3"]
-moves = moves
+moves = ["e4", "d5", "c3", "dxe4", "d4", "Bf5", "f3", "exf3", "Nxf3", "e6", "Bd3", "Bg6", "Nh4", "c6", "Bxg6", "hxg6", "Nf3", "Qc7", "O-O", "Bd6", "Kf2", "Bxh2", "Rh1", "Nd7", "Qe1", "O-O-O", "Qe4", "Ngf6", "Qe3", "Bg3+", "Kf1", "Rxh1+", "Ke2", "Ng4", "Qd2", "Ndf6", "Na3", "Ne4", "Qd3", "Nef2", "Qd2", "Qf4", "Qxf4", "Bxf4", "Bxf4", "Ne4", "Rxh1", "Ng3+", "Bxg3", "Nf6", "Kd1", "Ne4", "Kc1", "Nxg3", "Kb1", "Nxh1", "Nh4", "Ng3", "Nf3", "Nf5", "Ng5", "f6", "Nxe6", "Re8", "Nxg7", "Re1+", "Kc2", "Ne3+", "Kb3", "Rg1", "Kb4", "Rxg2", "Nc4", "Rxb2+", "Ka3", "Nd1", "Nd6+", "Kc7", "Nde8+", "Kd7", "Nxf6+", "Ke7", "Nf5+", "Kxf6", "Ne3", "Rxa2+", "Kb3", "1-0Black time out • White is victorious"]
+moves = ["e4", "e5", "d4", "exd4", "Nc3", "dxc3", "Bc4", "d6", "e5", "d5", "e6", "d4", "e7", "d3", "exf8=N"]
 
 def get_fen_row(row):
     result = ''
@@ -508,7 +505,7 @@ def get_fen_notation(board, move_idx, castling_rights, misc_data):
 for idx, move in enumerate(moves):
     print()
     print(f'{int(idx//2)+1}{"..." if idx % 2 == 1 else ""}{"   " if idx % 2 == 0 else ""}{move}')
-    print('++++++++')
+    print('==+++++++++++==')
     print()
     process_move(board, move, 'w' if idx % 2 == 0 else 'b', castling_rights, misc_data)
     get_fen_notation(board, idx, castling_rights, misc_data)
