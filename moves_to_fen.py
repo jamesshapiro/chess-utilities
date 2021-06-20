@@ -108,14 +108,15 @@ def print_board(board):
         #print_row = [icon_table.get(piece, piece) for piece in row]
         print(''.join(row))
 
-def print_castling_rights(castling_rights):
+def get_castling_rights(castling_rights):
     result = ''
     result += 'K' if castling_rights['white_kingside'] else ''
     result += 'Q' if castling_rights['white_queenside'] else ''
     result += 'k' if castling_rights['black_kingside'] else ''
     result += 'q' if castling_rights['black_queenside'] else ''
     if result:
-        print(result)
+        return result
+    return '-'
         
 def pawn_is_taking_without_promoting(move):
     if len(move) != 4:
@@ -414,7 +415,6 @@ def castle(board, player, castling_rights, is_kingside):
     fill_coords(board, (BOARD_FILES.index(new_castle_file), rank), rook)
     disable_castling_rights(player, castling_rights, kingside=True, queenside=True)
     print_board(board)
-    print_castling_rights(castling_rights)
 
 def is_castles(move):
     return move in ['O-O','O-O-O']
@@ -463,28 +463,57 @@ def process_move(board, move, player, castling_rights, misc_data):
 
     move_piece(board, start_coords, end_coords, piece)
     print_board(board)
-    print_castling_rights(castling_rights)
     pass
 
 print_board(board)
 print()
 
-#moves = ["e4", "d5", "exd5", "Qxd5", "Qf3", "Qxf3", "Nxf3", "Nf6", "Bc4", "Nc6", "d3", "Bf5", "Nc3", "O-O-O", "O-O", "Na5", "Bb3", "Nxb3", "axb3", "Kb8", "Be3", "b6", "Nb5", "a5", "c3", "Bc8", "b4", "Ba6", "c4", "Bxb5", "cxb5", "Rxd3", "bxa5", "bxa5", "Rxa5", "Rb3", "Rfa1", "Kc8", "Bd4", "e6", "Bc3", "Bd6", "Nd4", "Kd7", "Nxb3", "Nd5", "Nd4", "Nxc3", "bxc3", "Ke7", "c4", "Kf6", "Nc6", "Bc5", "Ra6", "Bb6", "R6a4", "Bc5", "Rc1", "Re8", "Rd1", "e5", "Nd8", "Bd6", "Nc6", "Bc5", "Rd5", "Bb6", "Ra6", "Bd4", "Nxd4+", "Ke7", "Nf3"]
 moves = ["e4", "d5", "exd5", "Qxd5", "Qf3", "Qxf3", "Nxf3", "Nf6", "Bc4", "Nc6", "d3", "Bf5", "Nc3", "O-O-O", "O-O", "Na5", "Bb3", "Nxb3", "axb3", "Kb8", "Be3", "b6", "Nb5", "a5", "c3", "Bc8", "b4", "Ba6", "c4", "Bxb5", "cxb5", "Rxd3", "bxa5", "bxa5", "Rxa5", "Rb3", "Rfa1", "Kc8", "Bd4", "e6", "Bc3", "Bd6", "Nd4", "Kd7", "Nxb3", "Nd5", "Nd4", "Nxc3", "bxc3", "Ke7", "c4", "Kf6", "Nc6", "Bc5", "Ra6", "Bb6", "R6a4", "Bc5", "Rc1", "Re8", "Rd1", "e5", "Nd8", "Bd6", "Nc6", "Bc5", "Rd5", "Bb6", "Ra6", "Bd4", "Nxd4+", "Ke7", "Nf3"]
+moves = moves
 
-for idx, move in enumerate(moves):
-    print()
-    print(f'{idx+1}   {move}')
-    print('++++++++')
-    print()
-    process_move(board, move, 'w' if idx % 2 == 0 else 'b', castling_rights, misc_data)
-    #print(misc_data)
-    print()
+def get_fen_row(row):
+    result = ''
+    hyphen_counter = 0
+    for square in row:
+        if square == '-':
+            hyphen_counter += 1
+        else:
+            if hyphen_counter > 0:
+               result += str(hyphen_counter)
+               hyphen_counter = 0
+            result += square
+    if hyphen_counter > 0:
+        result += str(hyphen_counter)
+    return result
 
-def get_fen_notation(board, move_num, castling_rights):
+def get_board_to_fen(board):
+    fen_rows = [get_fen_row(row) for row in board]
+    return '/'.join(fen_rows)
+    
+def get_fen_notation(board, move_idx, castling_rights, misc_data):
+    result = []
+    board_to_fen = get_board_to_fen(board)
+    result.append(board_to_fen)
+    result.append('w' if move_idx % 2 == 1 else 'b')
+    new_castling_rights = get_castling_rights(castling_rights)
+    if new_castling_rights:
+        result.append(new_castling_rights)
+    result.append(misc_data['en_passant_target'])
+    result.append(str(misc_data['halfmove_clock']))
+    result.append(str(int(move_idx // 2) + 1))
+    print(' '.join(result))
     pass
     
     
+for idx, move in enumerate(moves):
+    print()
+    print(f'{int(idx//2)+1}{"..." if idx % 2 == 1 else ""}{"   " if idx % 2 == 0 else ""}{move}')
+    print('++++++++')
+    print()
+    process_move(board, move, 'w' if idx % 2 == 0 else 'b', castling_rights, misc_data)
+    get_fen_notation(board, idx, castling_rights, misc_data)
+    print()
+
 """
 print()
 print()
