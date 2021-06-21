@@ -1,3 +1,4 @@
+import json
 import math
 import sys
 
@@ -47,20 +48,6 @@ def clone_board(board):
         new_board.append(row[:])
     return new_board
 
-board = clone_board(reference_board)
-
-castling_rights = {
-    'white_kingside': True,
-    'white_queenside': True,
-    'black_kingside': True,
-    'black_queenside': True,
-}
-
-misc_data = {
-    'en_passant_target': EMPTY,
-    'halfmove_clock': 0
-}
-
 def get_coords_from_square(square):
     square_file = BOARD_FILES.index(square[0])
     square_rank = BOARD_RANKS.index(square[1])
@@ -70,7 +57,7 @@ def get_piece_from_coords(board, index):
     index_file, index_rank = index
     return board[index_rank][index_file]
 
-def coords_to_squarecoords):
+def coords_to_square(coords):
     index_file, index_rank = coords
     square_rank = BOARD_RANKS[index_rank]
     square_file = BOARD_FILES[index_file]
@@ -413,7 +400,7 @@ def process_move(board, move, player, castling_rights, misc_data):
         start_coords_file = start_coords[0]
         end_coords_file = end_coords[0]
         if start_coords_file == end_coords_file and abs(start_coords[1] - end_coords[1]) == 2:
-            misc_data['en_passant_target'] = coords_to_square(start_coords[0], min(start_coords[1], end_coords[1]) + 1))
+            misc_data['en_passant_target'] = coords_to_square((start_coords[0], min(start_coords[1], end_coords[1]) + 1))
         if pawn_is_taking(move):
             clear_en_passant_coords_if_necessary(board, move, player)
     elif move[0] in move_fn_map:
@@ -424,11 +411,6 @@ def process_move(board, move, player, castling_rights, misc_data):
     move_piece(board, start_coords, end_coords, piece)
     print_board(board)
     pass
-
-print_board(board)
-print()
-
-moves = ["e4", "e6", "d4", "d5", "e5", "c5", "c3", "Nc6", "Nf3", "Nge7", "Be3", "Nf5", "Qd2", "Nxe3", "Qxe3", "Be7", "Be2", "O-O", "O-O", "f6", "b3", "fxe5", "Nxe5", "Nxe5", "Qxe5", "cxd4", "Qxd4", "Qc7", "Nd2", "Bc5", "Qd3", "b6", "b4", "Bd6", "Rac1", "Bxh2+", "Kh1", "e5", "g3", "e4", "Qxd5+", "Kh8", "Kxh2", "Rf6", "Qxa8", "Rh6+", "Kg2", "1-0Black resigned • White is victorious"]
 
 def get_fen_row(row):
     result = ''
@@ -460,15 +442,41 @@ def get_fen_notation(board, move_idx, castling_rights, misc_data):
     result.append(misc_data['en_passant_target'])
     result.append(str(misc_data['halfmove_clock']))
     result.append(str(int(move_idx // 2) + 1))
-    print(' '.join(result))
-    pass
-    
-    
-for idx, move in enumerate(moves):
+    result = ' '.join(result)
+    print(result)
+    return result
+
+def lambda_handler(event, context):
+    print(event)
+    print(event['body'])
+    body = json.loads(event['body'])
+    moves = body['moves']
+    board = clone_board(reference_board)
+    print_board(board)
     print()
-    print(f'{int(idx//2)+1}{"..." if idx % 2 == 1 else ""}{"   " if idx % 2 == 0 else ""}{move}')
-    print('==+++++++++++==')
-    print()
-    process_move(board, move, WHITE if idx % 2 == 0 else BLACK, castling_rights, misc_data)
-    get_fen_notation(board, idx, castling_rights, misc_data)
-    print()
+    castling_rights = {
+        'white_kingside': True,
+        'white_queenside': True,
+        'black_kingside': True,
+        'black_queenside': True,
+    }
+    misc_data = {
+        'en_passant_target': EMPTY,
+        'halfmove_clock': 0
+    }
+    for idx, move in enumerate(moves):
+        print()
+        print(f'{int(idx//2)+1}{"..." if idx % 2 == 1 else ""}{"   " if idx % 2 == 0 else ""}{move}')
+        print('==+++++++++++==')
+        print()
+        process_move(board, move, WHITE if idx % 2 == 0 else BLACK, castling_rights, misc_data)
+        get_fen_notation(board, idx, castling_rights, misc_data)
+        print()
+    return {
+        "statusCode": 200,
+        "body": json.dumps(
+            {
+                "fen": get_fen_notation(board, idx, castling_rights, misc_data),
+            }
+        ),
+    }
