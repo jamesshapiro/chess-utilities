@@ -70,7 +70,7 @@ def get_piece_from_coords(board, index):
     index_file, index_rank = index
     return board[index_rank][index_file]
 
-def coords_to_squarecoords):
+def coords_to_square(coords):
     index_file, index_rank = coords
     square_rank = BOARD_RANKS[index_rank]
     square_file = BOARD_FILES[index_file]
@@ -413,7 +413,7 @@ def process_move(board, move, player, castling_rights, misc_data):
         start_coords_file = start_coords[0]
         end_coords_file = end_coords[0]
         if start_coords_file == end_coords_file and abs(start_coords[1] - end_coords[1]) == 2:
-            misc_data['en_passant_target'] = coords_to_square(start_coords[0], min(start_coords[1], end_coords[1]) + 1))
+            misc_data['en_passant_target'] = coords_to_square((start_coords[0], min(start_coords[1], end_coords[1]) + 1))
         if pawn_is_taking(move):
             clear_en_passant_coords_if_necessary(board, move, player)
     elif move[0] in move_fn_map:

@@ -1,6 +1,7 @@
 import json
 import math
 import sys
+import boto3
 
 BOARD_FILES = 'abcdefgh'
 BOARD_RANKS = '87654321'
@@ -73,8 +74,8 @@ def fill_coords(board, square, piece):
 
 def print_board(board):
     for row in board:
-        #row = [icon_table.get(piece, piece) for piece in row]
-        print(' '.join(row))
+        row = [icon_table.get(piece, piece) for piece in row]
+        print(row)
 
 def get_castling_rights(castling_rights):
     result = ''
@@ -357,7 +358,7 @@ def castle(board, player, castling_rights, is_kingside):
     fill_coords(board, (BOARD_FILES.index(new_king_file), rank), king)
     fill_coords(board, (BOARD_FILES.index(new_castle_file), rank), rook)
     revoke_castling_rights(player, castling_rights, revoke_kingside=True, revoke_queenside=True)
-    print_board(board)
+    #print_board(board)
 
 def is_castles(move):
     return move in ['O-O','O-O-O']
@@ -409,7 +410,7 @@ def process_move(board, move, player, castling_rights, misc_data):
         start_coords = get_piece_coords(board, player, piece=KING)[0]
         revoke_castling_rights(player, castling_rights, revoke_kingside=True, revoke_queenside=True)
     move_piece(board, start_coords, end_coords, piece)
-    print_board(board)
+    #print_board(board)
     pass
 
 def get_fen_row(row):
@@ -447,13 +448,9 @@ def get_fen_notation(board, move_idx, castling_rights, misc_data):
     return result
 
 def lambda_handler(event, context):
-    print(event)
-    print(event['body'])
     body = json.loads(event['body'])
     moves = body['moves']
     board = clone_board(reference_board)
-    print_board(board)
-    print()
     castling_rights = {
         'white_kingside': True,
         'white_queenside': True,
@@ -465,18 +462,32 @@ def lambda_handler(event, context):
         'halfmove_clock': 0
     }
     for idx, move in enumerate(moves):
-        print()
-        print(f'{int(idx//2)+1}{"..." if idx % 2 == 1 else ""}{"   " if idx % 2 == 0 else ""}{move}')
-        print('==+++++++++++==')
-        print()
+        #print()
+        #print(f'{int(idx//2)+1}{"..." if idx % 2 == 1 else ""}{"   " if idx % 2 == 0 else ""}{move}')
+        #print('==+++++++++++==')
+        #print()
         process_move(board, move, WHITE if idx % 2 == 0 else BLACK, castling_rights, misc_data)
-        get_fen_notation(board, idx, castling_rights, misc_data)
-        print()
+        #get_fen_notation(board, idx, castling_rights, misc_data)
+        #print()
+    fen_notation = get_fen_notation(board, idx, castling_rights, misc_data)
+    lambda_client = boto3.client('lambda')
+    payload_string = json.dumps({'fen': fen_notation, 'depth': '15'})
+    response = lambda_client.invoke(FunctionName='ChessAI', Payload=bytes(payload_string, encoding='utf8'))
+    print_board(board)
+    payload = json.loads(response["Payload"].read())
+    #print(payload)
+    
     return {
         "statusCode": 200,
+        "headers": {
+            "Access-Control-Allow-Headers" : "Origin,X-Requested-With,Content-Type,Accept",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
+        },
         "body": json.dumps(
             {
-                "fen": get_fen_notation(board, idx, castling_rights, misc_data),
+                "fen": fen_notation,
+                "best_move": payload['bestmove']
             }
         ),
     }
